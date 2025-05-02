@@ -1,0 +1,1 @@
+[RestaurantModel("老北京烤鸭","北京",100), RestaurantModel("蟹黄面","上海",20), RestaurantModel("张姐火锅","成都",200)]

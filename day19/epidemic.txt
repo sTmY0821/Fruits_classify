@@ -1,0 +1,1 @@
+[EpidemicModel("上海", 100, 10), EpidemicModel("北京", 300, 20), EpidemicModel("广东", 400, 30)]
