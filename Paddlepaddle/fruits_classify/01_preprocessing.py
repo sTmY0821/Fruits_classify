@@ -28,7 +28,7 @@ for name,img_list in result_dict.items():
     print(name,len(img_list))
     with open(train_file_path,'a')as f:
         for img in img_list[:int(len(img_list)*0.9)]:
-            f.write(str(name_dict[name])+'\t'+img+'\n')
+            f.write(img+'\t'+str(name_dict[name])+'\n')
     with open(test_file_path,'a')as f:
         for img in img_list[int(len(img_list)*0.9):]:
-            f.write(str(name_dict[name])+'\t'+img+'\n')
+            f.write(img+'\t'+str(name_dict[name])+'\n')

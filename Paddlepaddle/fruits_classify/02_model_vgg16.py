@@ -87,7 +87,7 @@ x = fluid.layers.data(name='x', shape=[3, image_size, image_size], dtype='float3
 y = fluid.layers.data(name='y', shape=[1], dtype='int64')
 
 
-def convolution_neural_network(image):
+def vggnet16_convolution_neural_network(image):
     """
     创建CNN
     :param image: 图像数据
@@ -96,57 +96,33 @@ def convolution_neural_network(image):
     模型结构：
     """
 
-    # 第一组
-    conv_pool_1 = fluid.nets.simple_img_conv_pool(
-        input=image,
-        filter_size=filter_size,  # 卷积核大小
-        num_filters=num_filters1,  # 卷积核数量
-        pool_size=pool_size,  # 池化核大小
-        pool_stride=pool_stride,  # 池化步长
-        pool_type=pool_type,  # 池化类型
-        pool_padding=pool_padding,  # 池化padding
-        conv_stride=conv_stride,  # 卷积步长
-        conv_padding=conv_padding,  # 卷积核padding
-        act=act)  # 激活函数
-    drop1 = fluid.layers.dropout(x=conv_pool_1, dropout_prob=dropout_prob)
-    # 第二组
-    conv_pool_2 = fluid.nets.simple_img_conv_pool(
-        input=drop1,
-        filter_size=filter_size,  # 卷积核大小
-        num_filters=num_filters2,  # 卷积核数量
-        pool_size=pool_size,  # 池化核大小
-        pool_stride=pool_stride,  # 池化步长
-        pool_type=pool_type,  # 池化类型
-        pool_padding=pool_padding,  # 池化padding
-        conv_stride=conv_stride,  # 卷积步长
-        conv_padding=conv_padding,  # 卷积核padding
-        act=act
-    )
-    drop2 = fluid.layers.dropout(x=conv_pool_2, dropout_prob=dropout_prob)
-    # 第三组
-    conv_pool_3 = fluid.nets.simple_img_conv_pool(
-        input=drop2,
-        filter_size=filter_size,  # 卷积核大小
-        num_filters=num_filters3,  # 卷积核数量
-        pool_size=pool_size,  # 池化核大小
-        pool_stride=pool_stride,  # 池化步长
-        pool_type=pool_type,  # 池化类型
-        pool_padding=pool_padding,  # 池化padding
-        conv_stride=conv_stride,  # 卷积步长
-        conv_padding=conv_padding,  # 卷积核padding
-        act=act
-    )
-    drop3 = fluid.layers.dropout(x=conv_pool_3, dropout_prob=dropout_prob)
+    def conv_block(input,num_filter,groups):
+        conv_pool = fluid.nets.img_conv_group(
+            input=input,
+            conv_num_filter=[num_filter] * groups,
+            pool_size=vgg_params['pool_size'],
+            conv_padding=vgg_params['conv_padding'],
+            conv_filter_size=vgg_params['conv_filter_size'],
+            conv_act=vgg_params['conv_act'],
+            pool_stride=vgg_params['pool_stride'],
+            pool_type = vgg_params['pool_type'],
+            )
+        return conv_pool
+    conv1 = conv_block(image,64,2)
+    conv2 = conv_block(conv1,128,2)
+    conv3 = conv_block(conv2,256,3)
+    conv4 = conv_block(conv3,512,3)
+    conv5 = conv_block(conv4,512,3)
+    drop = fluid.layers.dropout(x=conv5, dropout_prob=dropout_prob)
+    fc1 = fluid.layers.fc(input=drop, size=512, act='relu')
+    bn = fluid.layers.batch_norm(input=fc1,act='relu')
+    drop2 = fluid.layers.dropout(x=bn, dropout_prob=dropout_prob)
+    fc2 = fluid.layers.fc(input=drop2, size=512, act='relu')
+    predict = fluid.layers.fc(input=fc2, size=5, act='softmax')
+    return predict
 
-    # 全连接层
-    fc = fluid.layers.fc(input=drop3, size=fc_size, act=fc_act)
-    drop4 = fluid.layers.dropout(x=fc, dropout_prob=dropout_prob)
 
-    # 输出层
-    pred_y = fluid.layers.fc(input=drop4, size=5, act='softmax')
-
-    return pred_y
-pred_y = convolution_neural_network(image=x)
+pred_y = vggnet16_convolution_neural_network(image=x)
 
 # 损失函数
 cost = fluid.layers.cross_entropy(input=pred_y, label=y)  # 交叉熵
@@ -166,8 +142,8 @@ exe = fluid.Executor(place)
 exe.run(fluid.default_startup_program())
 
 #检查路径是否存在模型
-if os.path.exists(model_train_path):
-    fluid.io.load_persistables(exe, model_train_path, fluid.default_main_program())
+if os.path.exists(vgg_train_path):
+    fluid.io.load_persistables(exe, vgg_train_path, fluid.default_main_program())
     print("增量加载成功")
 # 训练模型
 feeder = fluid.DataFeeder(feed_list=[x, y], place=place)
@@ -194,10 +170,10 @@ test_acc =exe.run(program=test_program,
 print(f'测试集准确率:{test_acc[0][0]}')
 
 #保存增量模型
-fluid.io.save_persistables(executor=exe, dirname=model_train_path,main_program=fluid.default_main_program())
+fluid.io.save_persistables(executor=exe, dirname=vgg_train_path,main_program=fluid.default_main_program())
 print('增量模型保存成功')
 #保存推理模型
-fluid.io.save_inference_model(dirname=model_infer_path,
+fluid.io.save_inference_model(dirname=vgg_infer_path,
                               feeded_var_names=['x'],
                               target_vars=[pred_y],
                               executor=exe)
